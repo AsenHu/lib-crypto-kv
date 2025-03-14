@@ -61,7 +61,7 @@ randomString 在创建后无法被修改，因此你可以直接从 AES 密钥�
 
 ### 获取对应 key 的 value
 
-GET /api/v1/{key}
+GET /api/v1/kvs/{key}
 
 该接口需要验证身份
 
@@ -99,7 +99,7 @@ POST /api/v1/newKey
 
 ### 修改 value
 
-PUT /api/v1/{key}
+PUT /api/v1/kvs/{key}
 
 **请求体**
 
@@ -121,7 +121,7 @@ PUT /api/v1/{key}
 
 ### 删除 value
 
-DELETE /api/v1/{key}
+DELETE /api/v1/kvs/{key}
 
 **请求参数**
 
@@ -139,7 +139,7 @@ DELETE /api/v1/{key}
 
 ### 检查更新
 
-HEAD /api/v1/{key}
+HEAD /api/v1/kvs/{key}
 
 **请求参数**
 
@@ -152,5 +152,61 @@ HEAD /api/v1/{key}
 **响应示例**
 
 200 响应
+
+没有 payload
+
+### 锁定 key
+
+GET /api/v1/spin/{key}?id={lockID}
+
+该接口和数据库是否执行读写操作没有任何关系，它只是用于解决不同的客户端编辑同一个 key 时导致并发不安全。
+
+客户端如果需要长时间的持有锁，可以在锁因为超时释放前，使用相同的 lockID 再次请求，以重置超时时间。
+
+**请求参数**
+
+|名字|类型|描述|默认值|
+|:-|:-|:-|:-|
+|key|string|必填：需要查询的 key|无|
+|lockID|string|必填：客户端生成的随机字符串|无|
+
+该接口需要验证身份
+
+**响应示例**
+
+200 响应
+
+该资源没有被占用，成功获取到锁
+
+409 响应
+
+该资源被占用，程序应等待
+
+没有 payload
+
+### 解锁 key
+
+DELETE /api/v1/spin/{key}?id={lockID}
+
+尽管不再发送 GET 请求可以释放锁，但使用 DELETE 可以立刻释放锁。
+
+**请求参数**
+
+|名字|类型|描述|默认值|
+|:-|:-|:-|:-|
+|key|string|必填：需要查询的 key|无|
+|lockID|string|必填：客户端生成的随机字符串|无|
+
+该接口需要验证身份
+
+**响应示例**
+
+200 响应
+
+成功释放锁
+
+404 响应
+
+锁不存在
 
 没有 payload
