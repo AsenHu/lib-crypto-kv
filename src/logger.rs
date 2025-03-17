@@ -1,0 +1,45 @@
+use std::io::Write;
+
+use axum::{extract::Request, middleware::Next, response::Response};
+use chrono::Local;
+use log::{Level, LevelFilter, info, warn};
+
+pub fn init() {
+    env_logger::Builder::new()
+        .format(move |buf, record| {
+            let timestamp = Local::now().format("%Y-%m-%dT%H:%M:%SZ");
+            let level_str = match record.level() {
+                Level::Trace => "\x1B[1;35mTRACE\x1B[0m",
+                Level::Debug => "\x1B[1;30mDEBUG\x1B[0m",
+                Level::Info => "\x1B[1;36mINFO\x1B[0m",
+                Level::Warn => "\x1B[1;93mWARN\x1B[0m",
+                Level::Error => "\x1B[1;31mERROR\x1B[0m",
+            };
+            writeln!(buf, "[{} {}]: {}", timestamp, level_str, record.args())
+        })
+        .filter_level(match std::env::var("RUST_LOG") {
+            Ok(val) => match val.as_str() {
+                "trace" => LevelFilter::Trace,
+                "debug" => LevelFilter::Debug,
+                "info" => LevelFilter::Info,
+                "warn" => LevelFilter::Warn,
+                "error" => LevelFilter::Error,
+                _ => LevelFilter::Info,
+            },
+            Err(_) => LevelFilter::Info,
+        })
+        .init();
+}
+
+pub async fn log_middleware(req: Request, next: Next) -> Response {
+    let method = req.method().clone();
+    let uri = req.uri().clone();
+    let response = next.run(req).await;
+    let status = response.status();
+    if status.is_server_error() {
+        warn!("{} {} {}", method, uri, response.status());
+    } else {
+        info!("{} {} {}", method, uri, response.status());
+    }
+    response
+}

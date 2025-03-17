@@ -7,6 +7,7 @@ use axum_extra::{
     TypedHeader,
     headers::{Authorization, authorization::Bearer},
 };
+use log::error;
 use serde::Deserialize;
 
 use crate::AppState;
@@ -23,7 +24,6 @@ pub async fn get_lock(
     TypedHeader(token): TypedHeader<Authorization<Bearer>>,
     Query(q): Query<Q>,
 ) -> impl IntoResponse {
-    const LOG_PREFIX: &str = "GET /api/v1/spin/";
     let db = &state.db;
     let lock = &state.lock;
 
@@ -35,27 +35,23 @@ pub async fn get_lock(
         Ok(Some(v)) => {
             if !v.metadata.is_allowed(&key, token) {
                 let status = StatusCode::FORBIDDEN;
-                info!(key, status);
                 return (status).into_response();
             }
             if lock.claim(key.as_ref(), lock_id).await {
                 let status = StatusCode::OK;
-                info!(key, status);
                 (status).into_response()
             } else {
                 let status = StatusCode::CONFLICT;
-                info!(key, status);
                 (status).into_response()
             }
         }
         Ok(None) => {
             let status = StatusCode::NOT_FOUND;
-            info!(key, status);
             (status).into_response()
         }
         Err(e) => {
             let status = StatusCode::INTERNAL_SERVER_ERROR;
-            error!(key, status, e);
+            error!("{}", e);
             (status).into_response()
         }
     }
@@ -67,7 +63,6 @@ pub async fn release_lock(
     TypedHeader(token): TypedHeader<Authorization<Bearer>>,
     Query(q): Query<Q>,
 ) -> impl IntoResponse {
-    const LOG_PREFIX: &str = "DELETE /api/v1/spin/";
     let db = &state.db;
     let lock = &state.lock;
 
@@ -79,27 +74,23 @@ pub async fn release_lock(
         Ok(Some(v)) => {
             if !v.metadata.is_allowed(&key, token) {
                 let status = StatusCode::FORBIDDEN;
-                info!(key, status);
                 return (status).into_response();
             }
             if lock.release(key.as_ref(), lock_id).await {
                 let status = StatusCode::OK;
-                info!(key, status);
                 (status).into_response()
             } else {
                 let status = StatusCode::NOT_FOUND;
-                info!(key, status);
                 (status).into_response()
             }
         }
         Ok(None) => {
             let status = StatusCode::NOT_FOUND;
-            info!(key, status);
             (status).into_response()
         }
         Err(e) => {
             let status = StatusCode::INTERNAL_SERVER_ERROR;
-            error!(key, status, e);
+            error!("{}", e);
             (status).into_response()
         }
     }
