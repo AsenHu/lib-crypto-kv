@@ -1,13 +1,13 @@
-use std::path::PathBuf;
+use std::{collections::HashSet, path::PathBuf};
 
-use log::info;
+use sled::{IVec, Tree};
 
 use crate::metadata::{Metadata, ToMetadata};
 
 #[derive(Debug, Clone)]
 pub struct Db {
-    metadata: sled::Tree,
-    data: sled::Tree,
+    metadata: Tree,
+    data: Tree,
 }
 
 pub fn open(path: impl Into<PathBuf>) -> Result<Db, sled::Error> {
@@ -15,13 +15,16 @@ pub fn open(path: impl Into<PathBuf>) -> Result<Db, sled::Error> {
 }
 
 pub struct Object {
-    pub data: sled::IVec,
+    pub data: IVec,
     pub metadata: Metadata,
 }
 
 impl Db {
     pub fn open(path: impl Into<PathBuf>) -> Result<Self, sled::Error> {
-        let db = sled::open(path.into())?;
+        let db = sled::Config::new()
+            .compression_factor(22)
+            .path(path.into())
+            .open()?;
         Ok(Self {
             metadata: db.open_tree("metadata")?,
             data: db.open_tree("data")?,
@@ -59,18 +62,19 @@ impl Db {
         self.metadata.remove(key)?;
         self.data.remove(key)
     }
-}
 
-pub fn reclaim_outdated(db: &Db) -> Result<(), sled::Error> {
-    let mut metadata = db.metadata.iter();
-    while let Some(result) = metadata.next() {
-        let (key, value) = result?;
-        let metadata = value.to_metadata();
-        if metadata.is_outdated() {
-            info!("reclaiming outdated key: {:?}", key);
-            db.metadata.remove(&key)?;
-            db.data.remove(key)?;
+    pub fn reclaim_outdated(&self) -> Result<HashSet<IVec>, sled::Error> {
+        let mut metadata = self.metadata.iter();
+        let mut keys = HashSet::new();
+        while let Some(result) = metadata.next() {
+            let (key, value) = result?;
+            let metadata = value.to_metadata();
+            if metadata.is_outdated() {
+                self.metadata.remove(&key)?;
+                self.data.remove(&key)?;
+                keys.insert(key);
+            }
         }
+        Ok(keys)
     }
-    Ok(())
 }

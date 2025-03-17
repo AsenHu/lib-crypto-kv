@@ -4,7 +4,7 @@ mod database;
 mod lock;
 mod metadata;
 
-use std::{io::Write, net::SocketAddr};
+use std::{io::Write, net::SocketAddr, sync::Arc};
 
 use axum::{
     Router,
@@ -12,9 +12,8 @@ use axum::{
 };
 use chrono::Local;
 use clap::Parser;
-use database::reclaim_outdated;
 use lock::Lock;
-use log::{Level, LevelFilter, error, info};
+use log::{Level, LevelFilter, debug, error, info};
 use tokio::net::TcpListener;
 
 #[derive(Debug, thiserror::Error)]
@@ -29,8 +28,40 @@ enum Error {
 
 #[derive(Clone)]
 struct AppState {
-    db: database::Db,
-    lock: Lock,
+    db: Arc<database::Db>,
+    lock: Arc<Lock>,
+}
+
+impl AppState {
+    fn new(db: database::Db, lock: Lock) -> Self {
+        Self {
+            db: Arc::new(db),
+            lock: Arc::new(lock),
+        }
+    }
+
+    async fn reclaim_worker(self) -> ! {
+        loop {
+            self.lock
+                .release_outdated()
+                .await
+                .iter()
+                .for_each(|(key, id)| {
+                    debug!("released lock: {} for {}", id, key);
+                });
+            match self.db.reclaim_outdated() {
+                Ok(outdated) => {
+                    outdated.iter().for_each(|key| {
+                        debug!("reclaimed key: {}", String::from_utf8_lossy(key));
+                    });
+                }
+                Err(e) => {
+                    error!("reclaim_outdated error: {}", e);
+                }
+            }
+            tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+        }
+    }
 }
 
 #[tokio::main]
@@ -39,11 +70,11 @@ async fn main() -> Result<(), Error> {
         .format(move |buf, record| {
             let timestamp = Local::now().format("%Y-%m-%dT%H:%M:%SZ");
             let level_str = match record.level() {
+                Level::Trace => "\x1B[1;35mTRACE\x1B[0m",
+                Level::Debug => "\x1B[1;30mDEBUG\x1B[0m",
+                Level::Info => "\x1B[1;36mINFO\x1B[0m",
                 Level::Warn => "\x1B[1;93mWARN\x1B[0m",
                 Level::Error => "\x1B[1;31mERROR\x1B[0m",
-                Level::Info => "\x1B[1;36mINFO\x1B[0m",
-                Level::Debug => "\x1B[1;30mDEBUG\x1B[0m",
-                Level::Trace => "\x1B[1;35mTRACE\x1B[0m",
             };
             writeln!(buf, "[{} {}]: {}", timestamp, level_str, record.args())
         })
@@ -60,19 +91,10 @@ async fn main() -> Result<(), Error> {
         })
         .init();
     let args = cli::Cli::parse();
-    let db = database::open(args.db.as_ref())?;
-    let lock = Lock::new();
-    let state = AppState { db, lock };
+    let state = AppState::new(database::open(args.db.as_ref())?, Lock::new());
     tokio::spawn({
-        let db = state.db.clone();
-        async move {
-            loop {
-                tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
-                if let Err(e) = reclaim_outdated(&db) {
-                    error!("reclaim_outdated: {}", e);
-                };
-            }
-        }
+        let state = state.clone();
+        state.reclaim_worker()
     });
     info!("listening on: {}", args.addr);
     let listener = TcpListener::bind(args.addr.parse::<SocketAddr>()?).await?;

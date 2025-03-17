@@ -1,7 +1,6 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
-use log::info;
 use tokio::sync::Mutex;
 
 #[derive(Clone, Eq, Hash, PartialEq)]
@@ -10,32 +9,15 @@ pub struct Locked {
     time: DateTime<Utc>,
 }
 
-#[derive(Clone)]
 pub struct Lock {
-    lock: Arc<Mutex<HashMap<Box<str>, Locked>>>,
+    lock: Mutex<HashMap<Box<str>, Locked>>,
 }
 
 impl Lock {
     pub fn new() -> Self {
-        let lock: Arc<Mutex<HashMap<Box<str>, Locked>>> = Arc::new(Mutex::new(HashMap::new()));
-        tokio::spawn({
-            let lock = lock.clone();
-            async move {
-                loop {
-                    tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
-                    let mut lock = lock.lock().await;
-                    lock.retain(|_, l| {
-                        if Utc::now().signed_duration_since(l.time).num_minutes() < 5 {
-                            true
-                        } else {
-                            info!("releasing lock {:?}", l.id);
-                            false
-                        }
-                    });
-                }
-            }
-        });
-        Self { lock }
+        Self {
+            lock: Mutex::new(HashMap::new()),
+        }
     }
 
     pub async fn claim(&self, key: impl Into<Box<str>>, id: impl Into<Box<str>>) -> bool {
@@ -61,26 +43,36 @@ impl Lock {
         }
     }
 
-    async fn release_inner(&self, key: Box<str>) -> bool {
-        match self.lock.lock().await.remove(&key) {
-            Some(_) => true,
-            None => false,
-        }
-    }
-
     pub async fn release(&self, key: impl Into<Box<str>>, id: impl Into<Box<str>>) -> bool {
         let key = key.into();
         let lock = self.lock.lock().await;
         match lock.get(&key).cloned() {
             Some(l) => {
-                drop(lock); // prevent deadlock
+                drop(lock);
                 if l.id == id.into() {
-                    self.release_inner(key).await
+                    match self.lock.lock().await.remove(&key) {
+                        Some(_) => true,
+                        None => false,
+                    }
                 } else {
                     false
                 }
             }
             None => false,
         }
+    }
+
+    pub async fn release_outdated(&self) -> HashMap<Box<str>, Box<str>> {
+        let mut lock = self.lock.lock().await;
+        let mut keys = HashMap::new();
+        lock.retain(|k, l| {
+            if Utc::now().signed_duration_since(l.time).num_minutes() < 5 {
+                true
+            } else {
+                keys.insert(k.clone(), l.id.clone());
+                false
+            }
+        });
+        keys
     }
 }
