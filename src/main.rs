@@ -3,8 +3,9 @@ mod cli;
 mod database;
 mod lock;
 mod metadata;
+mod state;
 
-use std::{io::Write, net::SocketAddr, sync::Arc};
+use std::{io::Write, net::SocketAddr};
 
 use axum::{
     Router,
@@ -13,7 +14,8 @@ use axum::{
 use chrono::Local;
 use clap::Parser;
 use lock::Lock;
-use log::{Level, LevelFilter, debug, error, info};
+use log::{Level, LevelFilter, error, info};
+use state::AppState;
 use tokio::net::TcpListener;
 
 #[derive(Debug, thiserror::Error)]
@@ -24,44 +26,6 @@ enum Error {
     AddrParse(#[from] std::net::AddrParseError),
     #[error(transparent)]
     Io(#[from] std::io::Error),
-}
-
-#[derive(Clone)]
-struct AppState {
-    db: Arc<database::Db>,
-    lock: Arc<Lock>,
-}
-
-impl AppState {
-    fn new(db: database::Db, lock: Lock) -> Self {
-        Self {
-            db: Arc::new(db),
-            lock: Arc::new(lock),
-        }
-    }
-
-    async fn reclaim_worker(self) -> ! {
-        loop {
-            self.lock
-                .release_outdated()
-                .await
-                .iter()
-                .for_each(|(key, id)| {
-                    debug!("released lock: {} for {}", id, key);
-                });
-            match self.db.reclaim_outdated() {
-                Ok(outdated) => {
-                    outdated.iter().for_each(|key| {
-                        debug!("reclaimed key: {}", String::from_utf8_lossy(key));
-                    });
-                }
-                Err(e) => {
-                    error!("reclaim_outdated error: {}", e);
-                }
-            }
-            tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
-        }
-    }
 }
 
 #[tokio::main]
