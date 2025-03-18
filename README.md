@@ -18,7 +18,7 @@
 
 |请求头|值|
 |:-|:-|
-|Authorization|Basic randomString|
+|Authorization|Bearer randomString|
 
 在创建 key 时，服务端会存储 randomString，并且在之后的读取、修改、删除时验证。
 
@@ -61,7 +61,11 @@ randomString 在创建后无法被修改，因此你可以直接从 AES 密钥�
 |Last-Modified|上次更新的时间|
 |Etag|value 的摘要（应该是 SHA3-512）|
 
-但在 `/api/v1/newKey` 接口中，这些内容是无意义的。
+但在 `/api/v1/newKey` 接口中，Last-Modified 是当前时间，Etag 是及时生成的。
+
+服务端建议使用 `Base(SHA3-512(加密 Value))` 来生成 Etag 的值，其中 Base 可以使用 Base64 (更好的兼容性) 或 Base91 (更短的长度)
+
+客户端原则上不应该尝试解析 Etag，因此服务端可以自行实现任意的 Etag 生成方法。
 
 ### 获取对应 key 的 value
 
@@ -208,3 +212,39 @@ DELETE /api/v1/spin/{key}?id={lockID}
 锁不存在
 
 没有 payload
+
+### 自动删除时间
+
+PUT /api/v1/kvs/{key}/autoDel
+
+从 key 最后一次被创读改开始，`autoDel` 天后将被自动删除。
+
+服务端可以按照自己方便的方式选择具体删除的时间，但受到一定的约束。
+
+具体的说，以 UTC 时间 0 时为一天的分界线，删除时间应该介于 `最后一次请求当天的开始 + autoDel` 至 `最后一次请求当天的结束 + autoDel`。
+
+**请求体**
+
+```
+7
+```
+
+请求体为多少天后删除。
+
+只允许设置自然数 (0 和正整数)
+
+该接口需要验证身份
+
+**响应示例**
+
+204 响应
+
+修改成功
+
+400 响应
+
+设置的值不合法，响应内容为服务端接受的最大天数。
+
+```
+365
+```
