@@ -47,9 +47,24 @@ async fn main() -> Result<(), Error> {
         .route("/api/v1/kvs/{key}", head(api::v1::kvs::check_update))
         .route("/api/v1/spin/{key}", get(api::v1::spin::get_lock))
         .route("/api/v1/spin/{key}", delete(api::v1::spin::release_lock))
+        .route("/api/v1/kvs/{key}/autoDel", put(api::v1::kvs::set_auto_del))
         .with_state(state)
         .layer(middleware::from_fn(logger::log_middleware));
     info!("server started");
-    axum::serve(listener, router).await?;
+    let signal_handler = async {
+        use tokio::signal::unix::{SignalKind, signal};
+        let mut term = signal(SignalKind::terminate()).unwrap();
+        let mut int = signal(SignalKind::interrupt()).unwrap();
+        tokio::select!(
+            _ = term.recv() => {},
+            _ = int.recv() => {}
+        );
+        info!("shutting down");
+    };
+    let axum_service = axum::serve(listener, router);
+    tokio::select! {
+        _ = signal_handler => {}
+        _ = axum_service => {}
+    }
     Ok(())
 }

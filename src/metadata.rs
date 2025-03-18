@@ -13,14 +13,17 @@ pub struct Metadata {
     pass: Box<[u8]>,
 }
 
+fn pass(k: &str, salt: &[u8], p: &str) -> Box<[u8]> {
+    Sha3_512::digest([k.as_bytes(), salt, p.as_bytes()].concat())
+        .as_slice()
+        .into()
+}
+
 impl Metadata {
     pub fn new(k: &str, v: &[u8], p: &str) -> Self {
         let dgst: Box<[u8]> = Sha3_512::digest(v).as_slice().into();
-        let salt: Box<[u8]> = rand::random::<[u8; 16]>().into();
-        let pass: Box<[u8]> =
-            Sha3_512::digest(&[k.as_bytes(), salt.as_ref(), p.as_bytes()].concat())
-                .as_slice()
-                .into();
+        let salt: Box<[u8]> = rand::random::<[u8; 64]>().into();
+        let pass = pass(k, &salt, p);
         Self {
             last_modified: Utc::now(),
             delete_after_days: 7,
@@ -35,11 +38,12 @@ impl Metadata {
         self.dgst = Sha3_512::digest(v).as_slice().into();
     }
 
+    pub fn set_auto_del(&mut self, days: u16) {
+        self.delete_after_days = days;
+    }
+
     pub fn is_allowed(&self, k: &str, p: &str) -> bool {
-        let pass: Box<[u8]> =
-            Sha3_512::digest(&[k.as_bytes(), self.salt.as_ref(), p.as_bytes()].concat())
-                .as_slice()
-                .into();
+        let pass = pass(k, &self.salt, p);
         self.pass == pass
     }
 

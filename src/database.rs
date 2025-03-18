@@ -64,9 +64,8 @@ impl Db {
     }
 
     pub fn reclaim_outdated(&self) -> Result<HashSet<IVec>, sled::Error> {
-        let mut metadata = self.metadata.iter();
         let mut keys = HashSet::new();
-        while let Some(result) = metadata.next() {
+        for result in &self.metadata {
             let (key, value) = result?;
             let metadata = value.to_metadata();
             if metadata.is_outdated() {

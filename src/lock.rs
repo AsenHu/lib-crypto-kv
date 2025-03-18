@@ -13,6 +13,14 @@ pub struct Lock {
     lock: Mutex<HashMap<Box<str>, Locked>>,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum LockError {
+    #[error("key not found")]
+    NotFound,
+    #[error("key already locked")]
+    Conflict,
+}
+
 impl Lock {
     pub fn new() -> Self {
         Self {
@@ -20,7 +28,11 @@ impl Lock {
         }
     }
 
-    pub async fn claim(&self, key: impl Into<Box<str>>, id: impl Into<Box<str>>) -> bool {
+    pub async fn claim(
+        &self,
+        key: impl Into<Box<str>>,
+        id: impl Into<Box<str>>,
+    ) -> Result<(), LockError> {
         let id = id.into();
         let key = key.into();
         let locked = Locked {
@@ -32,18 +44,22 @@ impl Lock {
             Some(l) => {
                 if l.id == id {
                     lock.insert(key, locked);
-                    return true;
+                    return Ok(());
                 }
-                false
+                Err(LockError::Conflict)
             }
             None => {
                 lock.insert(key, locked);
-                true
+                Ok(())
             }
         }
     }
 
-    pub async fn release(&self, key: impl Into<Box<str>>, id: impl Into<Box<str>>) -> bool {
+    pub async fn release(
+        &self,
+        key: impl Into<Box<str>>,
+        id: impl Into<Box<str>>,
+    ) -> Result<(), LockError> {
         let key = key.into();
         let lock = self.lock.lock().await;
         match lock.get(&key).cloned() {
@@ -51,14 +67,14 @@ impl Lock {
                 drop(lock);
                 if l.id == id.into() {
                     match self.lock.lock().await.remove(&key) {
-                        Some(_) => true,
-                        None => false,
+                        Some(_) => Ok(()),
+                        None => Err(LockError::NotFound),
                     }
                 } else {
-                    false
+                    Err(LockError::Conflict)
                 }
             }
-            None => false,
+            None => Err(LockError::NotFound),
         }
     }
 
