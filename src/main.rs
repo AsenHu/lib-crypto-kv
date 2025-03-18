@@ -33,7 +33,7 @@ async fn main() -> Result<(), Error> {
     logger::init();
     let args = cli::Cli::parse();
     let state = AppState::new(database::open(args.db.as_ref())?, Lock::new());
-    tokio::spawn({
+    let reclaim = tokio::spawn({
         let state = state.clone();
         state.reclaim_worker()
     });
@@ -63,6 +63,7 @@ async fn main() -> Result<(), Error> {
     };
     let axum_service = axum::serve(listener, router);
     tokio::select! {
+        _ = reclaim => {}
         _ = signal_handler => {}
         _ = axum_service => {}
     }

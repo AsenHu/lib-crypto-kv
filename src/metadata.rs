@@ -54,7 +54,8 @@ impl Metadata {
     pub fn is_outdated(&self) -> bool {
         let days = Utc::now()
             .signed_duration_since(self.last_modified)
-            .num_days();
+            .num_days()
+            + 1; // inclusive
         days > self.delete_after_days.into()
     }
 
