@@ -33,10 +33,10 @@ async fn main() -> Result<(), Error> {
     logger::init();
     let args = cli::Cli::parse();
     let state = AppState::new(database::open(args.db.as_ref())?, Lock::new());
-    let reclaim = tokio::spawn({
+    let reclaim = {
         let state = state.clone();
         state.reclaim_worker()
-    });
+    };
     info!("listening on: {}", args.addr);
     let listener = TcpListener::bind(args.addr.parse::<SocketAddr>()?).await?;
     let router = Router::new()
@@ -65,7 +65,7 @@ async fn main() -> Result<(), Error> {
     tokio::select! {
         _ = reclaim => {}
         _ = signal_handler => {}
-        _ = axum_service => {}
+        r = axum_service => { r?; }
     }
     Ok(())
 }
