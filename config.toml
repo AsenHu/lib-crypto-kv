@@ -12,9 +12,10 @@ addr = "127.0.0.1:10000"
 # the path have no default value, must be set
 [database]
 path = "target/tmpdb/"
-## two optional value, and the default are shown below
+## three optional value, and the default are shown below
 compression_factor = 5
 cache_capacity = 1073741824
+mode = "low_space"
 
 # the garbage collection configuration
 # default values are shown below
