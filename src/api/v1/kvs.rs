@@ -11,7 +11,7 @@ use axum_extra::{
 use log::error;
 use rand::Rng;
 
-use crate::{AppState, metadata::Metadata};
+use crate::{AppState, database::Object, metadata::Metadata};
 
 fn metadata_header(header: &mut header::HeaderMap, metadata: &Metadata) {
     header.insert(
@@ -67,7 +67,7 @@ pub async fn new_key(
 
     metadata_header(&mut header, &metadata);
 
-    match db.insert(key.as_bytes(), value, metadata) {
+    match db.insert(key.as_bytes(), Object::new(value.into(), metadata)) {
         Ok(_) => (StatusCode::CREATED, header, key).into_response(),
         Err(e) => {
             error!("{}", e);
@@ -100,7 +100,7 @@ pub async fn modify_value(
             let mut metadata = v.metadata;
             metadata.modify(&value);
             metadata_header(&mut header, &metadata);
-            match db.insert(key.as_bytes(), &value, metadata) {
+            match db.insert(key.as_bytes(), Object::new(value.as_ref().into(), metadata)) {
                 Ok(_) => (StatusCode::NO_CONTENT, header).into_response(),
                 Err(e) => {
                     error!("{}", e);
@@ -254,7 +254,7 @@ pub async fn set_auto_del(
             }
             let mut metadata = v.metadata;
             metadata.set_auto_del(days);
-            match db.insert(key.as_bytes(), &v.data, metadata) {
+            match db.insert(key.as_bytes(), Object::new(v.data, metadata)) {
                 Ok(_) => (StatusCode::NO_CONTENT).into_response(),
                 Err(e) => {
                     error!("{}", e);

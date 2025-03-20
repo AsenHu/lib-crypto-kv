@@ -44,7 +44,7 @@ impl AppState {
                 match self.db.reclaim_outdated() {
                     Ok(outdated) => {
                         outdated.iter().for_each(|key| {
-                            debug!("reclaimed key: {}", String::from_utf8_lossy(key));
+                            debug!("reclaimed key: {}", key);
                         });
                     }
                     Err(e) => {

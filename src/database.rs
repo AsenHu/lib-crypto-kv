@@ -48,22 +48,43 @@ impl Db {
         }))
     }
 
-    pub fn insert(
-        &self,
-        key: &[u8],
-        value: &[u8],
-        metadata: Metadata,
-    ) -> Result<Option<sled::IVec>, sled::Error> {
-        self.metadata.insert(key, metadata.into_boxed_slice())?;
-        self.data.insert(key, value)
+    pub fn insert(&self, key: &[u8], obj: Object) -> Result<Option<Object>, sled::Error> {
+        let metadata = obj.metadata.into_boxed_slice();
+        let value = obj.data;
+        let old_metadata = self.metadata.insert(key, metadata)?;
+        let old_metadata = match old_metadata {
+            Some(old_metadata) => old_metadata.to_metadata(),
+            None => return Ok(None),
+        };
+        let old_value = self.data.insert(key, value)?;
+        let old_value = match old_value {
+            Some(old_value) => old_value,
+            None => return Ok(None),
+        };
+        Ok(Some(Object {
+            data: old_value,
+            metadata: old_metadata,
+        }))
     }
 
-    pub fn remove(&self, key: &[u8]) -> Result<Option<sled::IVec>, sled::Error> {
-        self.metadata.remove(key)?;
-        self.data.remove(key)
+    pub fn remove(&self, key: &[u8]) -> Result<Option<Object>, sled::Error> {
+        let metadata = self.metadata.remove(key)?;
+        let metadata = match metadata {
+            Some(metadata) => metadata.to_metadata(),
+            None => return Ok(None),
+        };
+        let value = self.data.remove(key)?;
+        let value = match value {
+            Some(value) => value,
+            None => return Ok(None),
+        };
+        Ok(Some(Object {
+            data: value,
+            metadata,
+        }))
     }
 
-    pub fn reclaim_outdated(&self) -> Result<HashSet<IVec>, sled::Error> {
+    pub fn reclaim_outdated(&self) -> Result<HashSet<Box<str>>, sled::Error> {
         let mut keys = HashSet::new();
         for result in &self.metadata {
             let (key, value) = result?;
@@ -71,9 +92,15 @@ impl Db {
             if metadata.is_outdated() {
                 self.metadata.remove(&key)?;
                 self.data.remove(&key)?;
-                keys.insert(key);
+                keys.insert(String::from_utf8_lossy(&key).into_owned().into_boxed_str());
             }
         }
         Ok(keys)
+    }
+}
+
+impl Object {
+    pub fn new(data: IVec, metadata: Metadata) -> Self {
+        Self { data, metadata }
     }
 }
