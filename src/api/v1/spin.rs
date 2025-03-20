@@ -62,6 +62,10 @@ pub async fn get_lock(
     token: Option<TypedHeader<Authorization<Bearer>>>,
     Query(q): Query<Q>,
 ) -> impl IntoResponse {
+    if state.lazy {
+        let db = state.db.clone();
+        tokio::task::spawn_blocking(|| super::lazy_reclaim(db));
+    }
     let token = match token {
         Some(token) => token,
         None => return (StatusCode::UNAUTHORIZED).into_response(),
@@ -84,6 +88,10 @@ pub async fn release_lock(
     token: Option<TypedHeader<Authorization<Bearer>>>,
     Query(q): Query<Q>,
 ) -> impl IntoResponse {
+    if state.lazy {
+        let db = state.db.clone();
+        tokio::task::spawn_blocking(|| super::lazy_reclaim(db));
+    }
     let token = match token {
         Some(token) => token,
         None => return (StatusCode::UNAUTHORIZED).into_response(),

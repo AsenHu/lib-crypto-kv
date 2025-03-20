@@ -4,7 +4,7 @@ use axum::{extract::Request, middleware::Next, response::Response};
 use chrono::Local;
 use log::{Level, LevelFilter, info, warn};
 
-pub fn init() {
+pub fn init(level: LevelFilter) {
     env_logger::Builder::new()
         .format(move |buf, record| {
             let timestamp = Local::now().format("%Y-%m-%dT%H:%M:%SZ");
@@ -17,17 +17,7 @@ pub fn init() {
             };
             writeln!(buf, "[{} {}]: {}", timestamp, level_str, record.args())
         })
-        .filter_level(match std::env::var("RUST_LOG") {
-            Ok(val) => match val.as_str() {
-                "trace" => LevelFilter::Trace,
-                "debug" => LevelFilter::Debug,
-                "info" => LevelFilter::Info,
-                "warn" => LevelFilter::Warn,
-                "error" => LevelFilter::Error,
-                _ => LevelFilter::Info,
-            },
-            Err(_) => LevelFilter::Info,
-        })
+        .filter_level(level)
         .init();
 }
 

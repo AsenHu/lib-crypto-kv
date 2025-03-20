@@ -44,3 +44,4 @@ tokio = { version = "1.44.1", features = [
     "time",
     "signal",
 ] }
+toml = { version = "0.8.20", default-features = false, features = ["parse"] }

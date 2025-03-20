@@ -30,10 +30,16 @@ pub async fn new_key(
     State(state): State<AppState>,
     token: Option<TypedHeader<Authorization<Bearer>>>,
 ) -> impl IntoResponse {
+    if state.lazy {
+        let db = state.db.clone();
+        tokio::task::spawn_blocking(|| super::lazy_reclaim(db));
+    }
+
     let token = match token {
         Some(token) => token,
         None => return (StatusCode::UNAUTHORIZED).into_response(),
     };
+
     let db = &state.db;
 
     let mut key: Box<str>;
@@ -82,6 +88,11 @@ pub async fn modify_value(
     token: Option<TypedHeader<Authorization<Bearer>>>,
     value: Bytes,
 ) -> impl IntoResponse {
+    if state.lazy {
+        let db = state.db.clone();
+        tokio::task::spawn_blocking(|| super::lazy_reclaim(db));
+    }
+
     let token = match token {
         Some(token) => token,
         None => return (StatusCode::UNAUTHORIZED).into_response(),
@@ -121,6 +132,11 @@ pub async fn remove_key(
     Path(key): Path<Box<str>>,
     token: Option<TypedHeader<Authorization<Bearer>>>,
 ) -> impl IntoResponse {
+    if state.lazy {
+        let db = state.db.clone();
+        tokio::task::spawn_blocking(|| super::lazy_reclaim(db));
+    }
+
     let token = match token {
         Some(token) => token,
         None => return (StatusCode::UNAUTHORIZED).into_response(),
@@ -156,6 +172,11 @@ pub async fn get_value(
     Path(key): Path<Box<str>>,
     token: Option<TypedHeader<Authorization<Bearer>>>,
 ) -> impl IntoResponse {
+    if state.lazy {
+        let db = state.db.clone();
+        tokio::task::spawn_blocking(|| super::lazy_reclaim(db));
+    }
+
     let token = match token {
         Some(token) => token,
         None => return (StatusCode::UNAUTHORIZED).into_response(),
@@ -191,6 +212,11 @@ pub async fn check_update(
     Path(key): Path<Box<str>>,
     token: Option<TypedHeader<Authorization<Bearer>>>,
 ) -> impl IntoResponse {
+    if state.lazy {
+        let db = state.db.clone();
+        tokio::task::spawn_blocking(|| super::lazy_reclaim(db));
+    }
+
     let token = match token {
         Some(token) => token,
         None => return (StatusCode::UNAUTHORIZED).into_response(),
@@ -224,6 +250,11 @@ pub async fn set_auto_del(
     token: Option<TypedHeader<Authorization<Bearer>>>,
     body: Bytes,
 ) -> impl IntoResponse {
+    if state.lazy {
+        let db = state.db.clone();
+        tokio::task::spawn_blocking(|| super::lazy_reclaim(db));
+    }
+
     let token = match token {
         Some(token) => token,
         None => return (StatusCode::UNAUTHORIZED).into_response(),
@@ -245,12 +276,12 @@ pub async fn set_auto_del(
 
     match db.get(key.as_bytes()) {
         Ok(Some(v)) => {
-            const MAX_DAYS: u16 = 365;
             if !v.metadata.is_allowed(&key, token) {
                 return (StatusCode::FORBIDDEN).into_response();
             }
-            if days > MAX_DAYS {
-                return (StatusCode::BAD_REQUEST, MAX_DAYS.to_string()).into_response();
+            if state.auto_del_max_days < days.into() {
+                return (StatusCode::BAD_REQUEST, state.auto_del_max_days.to_string())
+                    .into_response();
             }
             let mut metadata = v.metadata;
             metadata.set_auto_del(days);

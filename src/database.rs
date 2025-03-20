@@ -10,19 +10,22 @@ pub struct Db {
     data: Tree,
 }
 
-pub fn open(path: impl Into<PathBuf>) -> Result<Db, sled::Error> {
-    Db::open(path)
-}
-
 pub struct Object {
     pub data: IVec,
     pub metadata: Metadata,
 }
 
 impl Db {
-    pub fn open(path: impl Into<PathBuf>) -> Result<Self, sled::Error> {
+    pub fn open(
+        path: impl Into<PathBuf>,
+        mode: sled::Mode,
+        compression_factor: i32,
+        cache_capacity: u64,
+    ) -> Result<Self, sled::Error> {
         let db = sled::Config::new()
-            .compression_factor(22)
+            .cache_capacity(cache_capacity)
+            .mode(mode)
+            .compression_factor(compression_factor)
             .path(path.into())
             .open()?;
         Ok(Self {

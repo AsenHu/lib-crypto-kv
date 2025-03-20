@@ -8,21 +8,25 @@ use crate::{database, lock::Lock};
 pub struct AppState {
     pub db: Arc<database::Db>,
     pub lock: Arc<Lock>,
+    pub auto_del_max_days: u64,
+    pub lazy: bool,
 }
 
 impl AppState {
-    pub fn new(db: database::Db, lock: Lock) -> Self {
+    pub fn new(db: database::Db, lock: Lock, auto_del_max_days: u64, lazy: bool) -> Self {
         Self {
             db: Arc::new(db),
             lock: Arc::new(lock),
+            auto_del_max_days,
+            lazy,
         }
     }
 
-    pub async fn reclaim_worker(self) -> ! {
+    pub async fn reclaim_worker(self, lock_ttl: i64) -> ! {
         let lock = async {
             loop {
                 self.lock
-                    .release_outdated()
+                    .release_outdated(lock_ttl)
                     .await
                     .iter()
                     .for_each(|(key, id)| {
@@ -32,6 +36,9 @@ impl AppState {
             }
         };
         let reclaim = async {
+            if self.lazy {
+                std::future::pending::<()>().await;
+            }
             loop {
                 let now = Utc::now();
                 let next_midnight = Utc

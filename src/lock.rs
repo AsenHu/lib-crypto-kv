@@ -78,11 +78,11 @@ impl Lock {
         }
     }
 
-    pub async fn release_outdated(&self) -> HashMap<Box<str>, Box<str>> {
+    pub async fn release_outdated(&self, lock_ttl: i64) -> HashMap<Box<str>, Box<str>> {
         let mut lock = self.lock.lock().await;
         let mut keys = HashMap::new();
         lock.retain(|k, l| {
-            if Utc::now().signed_duration_since(l.time).num_minutes() < 5 {
+            if Utc::now().signed_duration_since(l.time).num_minutes() < lock_ttl {
                 true
             } else {
                 keys.insert(k.clone(), l.id.clone());

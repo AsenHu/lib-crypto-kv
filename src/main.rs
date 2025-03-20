@@ -1,44 +1,57 @@
 mod api;
 mod cli;
+mod config;
 mod database;
 mod lock;
 mod logger;
 mod metadata;
 mod state;
 
-use std::net::SocketAddr;
-
 use axum::{
     Router, middleware,
     routing::{delete, get, head, post, put},
 };
 use clap::Parser;
-use lock::Lock;
 use log::{error, info};
-use state::AppState;
 use tokio::net::TcpListener;
+
+use crate::cli::Cli;
+use crate::config::Config;
+use crate::database::Db;
+use crate::lock::Lock;
+use crate::state::AppState;
 
 #[derive(Debug, thiserror::Error)]
 enum Error {
     #[error(transparent)]
     Sled(#[from] sled::Error),
     #[error(transparent)]
-    AddrParse(#[from] std::net::AddrParseError),
-    #[error(transparent)]
     Io(#[from] std::io::Error),
+    #[error(transparent)]
+    Config(#[from] config::Error),
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    logger::init();
-    let args = cli::Cli::parse();
-    let state = AppState::new(database::open(args.db.as_ref())?, Lock::new());
+    let config = Config::from_file(&Cli::parse().config)?;
+    logger::init(config.log.level.into());
+    let state = AppState::new(
+        Db::open(
+            config.database.path,
+            config.database.mode.into(),
+            config.database.compression_factor,
+            config.database.cache_capacity,
+        )?,
+        Lock::new(),
+        config.garbage_collection.auto_delete.max_days.into(),
+        config.garbage_collection.auto_delete.lazy,
+    );
     let reclaim = {
         let state = state.clone();
-        state.reclaim_worker()
+        state.reclaim_worker(config.garbage_collection.lock.expire_minute)
     };
-    info!("listening on: {}", args.addr);
-    let listener = TcpListener::bind(args.addr.parse::<SocketAddr>()?).await?;
+    info!("listening on: {}", config.listen.addr);
+    let listener = TcpListener::bind(config.listen.addr).await?;
     let router = Router::new()
         .route("/api/v1/kvs/{key}", get(api::v1::kvs::get_value))
         .route("/api/v1/newKey", post(api::v1::kvs::new_key))
