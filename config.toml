@@ -8,7 +8,7 @@ level = "info"
 [listen]
 addr = "127.0.0.1:10000"
 
-# the database path
+# the database
 # the path have no default value, must be set
 [database]
 path = "target/tmpdb/"
