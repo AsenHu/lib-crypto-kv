@@ -98,7 +98,7 @@ pub async fn modify_value(
             }
             let mut header = header::HeaderMap::new();
             let mut metadata = v.metadata;
-            metadata.modifiy(&value);
+            metadata.modify(&value);
             metadata_header(&mut header, &metadata);
             match db.insert(key.as_bytes(), &value, metadata) {
                 Ok(_) => (StatusCode::NO_CONTENT, header).into_response(),

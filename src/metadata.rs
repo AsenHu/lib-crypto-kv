@@ -33,7 +33,7 @@ impl Metadata {
         }
     }
 
-    pub fn modifiy(&mut self, v: &[u8]) {
+    pub fn modify(&mut self, v: &[u8]) {
         self.last_modified = Utc::now();
         self.dgst = Sha3_512::digest(v).as_slice().into();
     }
