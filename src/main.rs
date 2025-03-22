@@ -7,12 +7,13 @@ mod logger;
 mod metadata;
 mod state;
 
+use anyhow::Result;
 use axum::{
     Router, middleware,
     routing::{delete, get, head, post, put},
 };
 use clap::Parser;
-use log::{error, info};
+use log::info;
 use tokio::net::TcpListener;
 
 use crate::cli::Cli;
@@ -21,18 +22,8 @@ use crate::database::Db;
 use crate::lock::Lock;
 use crate::state::AppState;
 
-#[derive(Debug, thiserror::Error)]
-enum Error {
-    #[error(transparent)]
-    Sled(#[from] sled::Error),
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
-    #[error(transparent)]
-    Config(#[from] config::Error),
-}
-
 #[tokio::main]
-async fn main() -> Result<(), Error> {
+async fn main() -> Result<()> {
     let config = Config::from_file(&Cli::parse().config)?;
     logger::init(config.log.level.into());
     let state = AppState::new(

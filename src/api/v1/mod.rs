@@ -7,7 +7,7 @@ use log::{debug, error};
 
 use crate::database::Db;
 
-pub fn lazy_reclaim(db: Arc<Db>) {
+fn lazy_reclaim(db: Arc<Db>) {
     debug!("lazy_reclaim: start");
     match db.reclaim_outdated() {
         Ok(outdated) => {

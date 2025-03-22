@@ -44,9 +44,10 @@ impl Lock {
             Some(l) => {
                 if l.id == id {
                     lock.insert(key, locked);
-                    return Ok(());
+                    Ok(())
+                } else {
+                    Err(LockError::Conflict)
                 }
-                Err(LockError::Conflict)
             }
             None => {
                 lock.insert(key, locked);

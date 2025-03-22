@@ -1,4 +1,4 @@
-use std::{collections::HashSet, path::PathBuf};
+use std::{collections::HashSet, path::Path};
 
 use sled::{IVec, Tree};
 
@@ -17,7 +17,7 @@ pub struct Object {
 
 impl Db {
     pub fn open(
-        path: impl Into<PathBuf>,
+        path: impl AsRef<Path>,
         mode: sled::Mode,
         compression_factor: i32,
         cache_capacity: u64,
@@ -26,7 +26,7 @@ impl Db {
             .cache_capacity(cache_capacity)
             .mode(mode)
             .compression_factor(compression_factor)
-            .path(path.into())
+            .path(path.as_ref())
             .open()?;
         Ok(Self {
             metadata: db.open_tree("metadata")?,
