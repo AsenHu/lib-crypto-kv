@@ -7,6 +7,8 @@ mod logger;
 mod metadata;
 mod state;
 
+use std::net::SocketAddr;
+
 use anyhow::Result;
 use axum::{
     Router, middleware,
@@ -65,7 +67,10 @@ async fn main() -> Result<()> {
         );
         info!("shutting down");
     };
-    let axum_service = axum::serve(listener, router);
+    let axum_service = axum::serve(
+        listener,
+        router.into_make_service_with_connect_info::<SocketAddr>(),
+    );
     tokio::select! {
         _ = reclaim => {}
         _ = signal_handler => {}

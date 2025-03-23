@@ -42,26 +42,36 @@ pub async fn new_key(
 
     let db = &state.db;
 
-    let mut key: Box<str>;
+    let key: Box<str>;
     let mut rng = rand::rng();
     let mut length = 1u8;
     loop {
         const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-        key = (0..length)
-            .map(|_| {
-                let idx = rng.random_range(0..CHARSET.len());
-                CHARSET[idx] as char
-            })
-            .collect();
-        match db.get(key.as_bytes()) {
-            Ok(None) => break,
-            Ok(Some(_)) => {
-                length += 1;
+        let mut candidate: Option<Box<str>> = None;
+        for _ in 0..10 {
+            let potential: Box<str> = (0..length)
+                .map(|_| {
+                    let i = rng.random_range(0..CHARSET.len());
+                    CHARSET[i] as char
+                })
+                .collect();
+            match db.get(potential.as_bytes()) {
+                Ok(None) => {
+                    candidate = Some(potential);
+                    break;
+                }
+                Ok(Some(_)) => continue,
+                Err(e) => {
+                    error!("{}", e);
+                    return (StatusCode::INTERNAL_SERVER_ERROR).into_response();
+                }
             }
-            Err(e) => {
-                error!("{}", e);
-                return (StatusCode::INTERNAL_SERVER_ERROR).into_response();
-            }
+        }
+        if let Some(k) = candidate {
+            key = k;
+            break;
+        } else {
+            length += 1;
         }
     }
 

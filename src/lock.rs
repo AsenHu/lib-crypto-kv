@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use tokio::sync::Mutex;
 
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone)]
 pub struct Locked {
     id: Box<str>,
     time: DateTime<Utc>,

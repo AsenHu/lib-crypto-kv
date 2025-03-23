@@ -4,25 +4,30 @@ use serde::{Deserialize, Serialize};
 use sha3::{Digest, Sha3_512};
 use sled::IVec;
 
+#[serde_with::serde_as]
 #[derive(Serialize, Deserialize)]
 pub struct Metadata {
     last_modified: DateTime<Utc>,
     delete_after_days: u16,
-    dgst: Box<[u8]>,
-    salt: Box<[u8]>,
-    pass: Box<[u8]>,
+    #[serde_as(as = "[_; 64]")]
+    dgst: [u8; 64],
+    #[serde_as(as = "[_; 64]")]
+    salt: [u8; 64],
+    #[serde_as(as = "[_; 64]")]
+    pass: [u8; 64],
 }
 
-fn pass(k: &str, salt: &[u8], p: &str) -> Box<[u8]> {
+fn pass(k: &str, salt: &[u8], p: &str) -> [u8; 64] {
     Sha3_512::digest([k.as_bytes(), salt, p.as_bytes()].concat())
         .as_slice()
-        .into()
+        .try_into()
+        .unwrap()
 }
 
 impl Metadata {
     pub fn new(k: &str, v: &[u8], p: &str) -> Self {
-        let dgst: Box<[u8]> = Sha3_512::digest(v).as_slice().into();
-        let salt: Box<[u8]> = rand::random::<[u8; 64]>().into();
+        let dgst = Sha3_512::digest(v).as_slice().try_into().unwrap();
+        let salt = rand::random::<[u8; 64]>();
         let pass = pass(k, &salt, p);
         Self {
             last_modified: Utc::now(),
@@ -35,7 +40,7 @@ impl Metadata {
 
     pub fn modify(&mut self, v: &[u8]) {
         self.last_modified = Utc::now();
-        self.dgst = Sha3_512::digest(v).as_slice().into();
+        self.dgst = Sha3_512::digest(v).as_slice().try_into().unwrap();
     }
 
     pub fn set_auto_del(&mut self, days: u16) {

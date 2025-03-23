@@ -4,7 +4,7 @@ use sled::{IVec, Tree};
 
 use crate::metadata::{Metadata, ToMetadata};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Db {
     metadata: Tree,
     data: Tree,
@@ -35,15 +35,9 @@ impl Db {
     }
 
     pub fn get(&self, key: &[u8]) -> Result<Option<Object>, sled::Error> {
-        let metadata = self.metadata.get(key)?;
-        let metadata = match metadata {
-            Some(metadata) => metadata.to_metadata(),
-            None => return Ok(None),
-        };
-        let value = self.data.get(key)?;
-        let value = match value {
-            Some(value) => value,
-            None => return Ok(None),
+        let (metadata, value) = match (self.metadata.get(key)?, self.data.get(key)?) {
+            (Some(metadata), Some(value)) => (metadata.to_metadata(), value),
+            _ => return Ok(None),
         };
         Ok(Some(Object {
             data: value,
@@ -52,34 +46,23 @@ impl Db {
     }
 
     pub fn insert(&self, key: &[u8], obj: Object) -> Result<Option<Object>, sled::Error> {
-        let metadata = obj.metadata.into_boxed_slice();
-        let value = obj.data;
-        let old_metadata = self.metadata.insert(key, metadata)?;
-        let old_metadata = match old_metadata {
-            Some(old_metadata) => old_metadata.to_metadata(),
-            None => return Ok(None),
-        };
-        let old_value = self.data.insert(key, value)?;
-        let old_value = match old_value {
-            Some(old_value) => old_value,
-            None => return Ok(None),
+        let (metadata, value) = match (
+            self.metadata.insert(key, obj.metadata.into_boxed_slice())?,
+            self.data.insert(key, obj.data)?,
+        ) {
+            (Some(metadata), Some(value)) => (metadata.to_metadata(), value),
+            _ => return Ok(None),
         };
         Ok(Some(Object {
-            data: old_value,
-            metadata: old_metadata,
+            data: value,
+            metadata: metadata,
         }))
     }
 
     pub fn remove(&self, key: &[u8]) -> Result<Option<Object>, sled::Error> {
-        let metadata = self.metadata.remove(key)?;
-        let metadata = match metadata {
-            Some(metadata) => metadata.to_metadata(),
-            None => return Ok(None),
-        };
-        let value = self.data.remove(key)?;
-        let value = match value {
-            Some(value) => value,
-            None => return Ok(None),
+        let (metadata, value) = match (self.metadata.remove(key)?, self.data.remove(key)?) {
+            (Some(metadata), Some(value)) => (metadata.to_metadata(), value),
+            _ => return Ok(None),
         };
         Ok(Some(Object {
             data: value,

@@ -1,6 +1,10 @@
-use std::io::Write;
+use std::{io::Write, net::SocketAddr};
 
-use axum::{extract::Request, middleware::Next, response::Response};
+use axum::{
+    extract::{ConnectInfo, Request},
+    middleware::Next,
+    response::Response,
+};
 use chrono::Local;
 use log::{Level, LevelFilter, info, warn};
 
@@ -21,11 +25,16 @@ pub fn init(level: LevelFilter) {
         .init();
 }
 
-pub async fn log_middleware(req: Request, next: Next) -> Response {
+pub async fn log_middleware(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    req: Request,
+    next: Next,
+) -> Response {
     let method = req.method().clone();
     let uri = req.uri().clone();
     let response = next.run(req).await;
     let status = response.status();
+    info!("{} {}", addr, uri);
     if status.is_server_error() {
         warn!("{} {} {}", method, uri, response.status());
     } else {
