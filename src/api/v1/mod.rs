@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use log::{debug, error};
 
-use crate::database::Db;
+use crate::db::Db;
 
 fn lazy_reclaim(db: Arc<Db>) {
     debug!("lazy_reclaim: start");

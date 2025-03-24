@@ -12,7 +12,7 @@ use serde::Deserialize;
 
 use crate::{
     AppState,
-    database::Db,
+    db::Db,
     lock::{Lock, LockError},
 };
 

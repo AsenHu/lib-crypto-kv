@@ -11,7 +11,7 @@ use axum_extra::{
 use log::error;
 use rand::Rng;
 
-use crate::{AppState, database::Object, metadata::Metadata};
+use crate::{AppState, db::Metadata, db::Object};
 
 fn metadata_header(header: &mut header::HeaderMap, metadata: &Metadata) {
     header.insert(

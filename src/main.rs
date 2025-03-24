@@ -1,10 +1,9 @@
 mod api;
 mod cli;
 mod config;
-mod database;
+mod db;
 mod lock;
 mod logger;
-mod metadata;
 mod state;
 
 use std::net::SocketAddr;
@@ -20,7 +19,7 @@ use tokio::net::TcpListener;
 
 use crate::cli::Cli;
 use crate::config::Config;
-use crate::database::Db;
+use crate::db::Db;
 use crate::lock::Lock;
 use crate::state::AppState;
 
@@ -55,7 +54,8 @@ async fn main() -> Result<()> {
         .route("/api/v1/spin/{key}", delete(api::v1::spin::release_lock))
         .route("/api/v1/kvs/{key}/autoDel", put(api::v1::kvs::set_auto_del))
         .with_state(state)
-        .layer(middleware::from_fn(logger::log_middleware));
+        .layer(middleware::from_fn(logger::log_middleware))
+        .into_make_service_with_connect_info::<SocketAddr>();
     info!("server started");
     let signal_handler = async {
         use tokio::signal::unix::{SignalKind, signal};
@@ -67,10 +67,7 @@ async fn main() -> Result<()> {
         );
         info!("shutting down");
     };
-    let axum_service = axum::serve(
-        listener,
-        router.into_make_service_with_connect_info::<SocketAddr>(),
-    );
+    let axum_service = axum::serve(listener, router);
     tokio::select! {
         _ = reclaim => {}
         _ = signal_handler => {}

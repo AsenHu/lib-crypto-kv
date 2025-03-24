@@ -3,17 +3,18 @@ use std::sync::Arc;
 use chrono::{Datelike, TimeZone as _, Utc};
 use log::{debug, error};
 
-use crate::{database, lock::Lock};
+use crate::{db::Db, lock::Lock};
+
 #[derive(Clone)]
 pub struct AppState {
-    pub db: Arc<database::Db>,
+    pub db: Arc<Db>,
     pub lock: Arc<Lock>,
     pub auto_del_max_days: u64,
     pub lazy: bool,
 }
 
 impl AppState {
-    pub fn new(db: database::Db, lock: Lock, auto_del_max_days: u64, lazy: bool) -> Self {
+    pub fn new(db: Db, lock: Lock, auto_del_max_days: u64, lazy: bool) -> Self {
         Self {
             db: Arc::new(db),
             lock: Arc::new(lock),

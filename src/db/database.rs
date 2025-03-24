@@ -2,7 +2,7 @@ use std::{collections::HashSet, path::Path};
 
 use sled::{IVec, Tree};
 
-use crate::metadata::{Metadata, ToMetadata};
+use super::metadata::{Metadata, ToMetadata};
 
 #[derive(Clone)]
 pub struct Db {

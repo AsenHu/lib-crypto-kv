@@ -34,11 +34,11 @@ pub async fn log_middleware(
     let uri = req.uri().clone();
     let response = next.run(req).await;
     let status = response.status();
-    info!("{} {}", addr, uri);
+    let msg = format!("{}: {} {} {}", addr, method, uri, status);
     if status.is_server_error() {
-        warn!("{} {} {}", method, uri, response.status());
+        warn!("{}", msg);
     } else {
-        info!("{} {} {}", method, uri, response.status());
+        info!("{}", msg);
     }
     response
 }

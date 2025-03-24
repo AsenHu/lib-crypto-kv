@@ -75,7 +75,7 @@ impl Metadata {
     }
 }
 
-pub trait ToMetadata {
+pub(super) trait ToMetadata {
     fn to_metadata(self) -> Metadata;
 }
 
