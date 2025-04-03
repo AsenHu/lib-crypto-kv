@@ -17,16 +17,17 @@ pub struct Metadata {
     pass: [u8; 64],
 }
 
+fn dgst(v: &[u8]) -> [u8; 64] {
+    Sha3_512::digest(v).as_slice().try_into().unwrap()
+}
+
 fn pass(k: &str, salt: &[u8], p: &str) -> [u8; 64] {
-    Sha3_512::digest([k.as_bytes(), salt, p.as_bytes()].concat())
-        .as_slice()
-        .try_into()
-        .unwrap()
+    dgst(&[k.as_bytes(), salt, p.as_bytes()].concat())
 }
 
 impl Metadata {
     pub fn new(k: &str, v: &[u8], p: &str) -> Self {
-        let dgst = Sha3_512::digest(v).as_slice().try_into().unwrap();
+        let dgst = dgst(v);
         let salt = rand::random::<[u8; 64]>();
         let pass = pass(k, &salt, p);
         Self {
@@ -40,7 +41,7 @@ impl Metadata {
 
     pub fn modify(&mut self, v: &[u8]) {
         self.last_modified = Utc::now();
-        self.dgst = Sha3_512::digest(v).as_slice().try_into().unwrap();
+        self.dgst = dgst(v);
     }
 
     pub fn set_auto_del(&mut self, days: u16) {
